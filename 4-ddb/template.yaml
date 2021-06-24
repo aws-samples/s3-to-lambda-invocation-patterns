@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Bucket processing writing to same bucket, using DynamoDB table to avoid recursion.
+
+Parameters:
+  SourceBucketName:
+    Type: String
+
+Resources:
+  ## S3 bucket
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref SourceBucketName    
+
+  ## DynamoDB table
+  DDBtable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: ID
+        AttributeType: S
+      KeySchema:
+      - AttributeName: ID
+        KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: TimeToLive
+        Enabled: true        
+      BillingMode: PAY_PER_REQUEST 
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE   
+
+  ## Lambda function
+  S3ProcessorFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: s3Function/
+      Handler: app.handler
+      Runtime: nodejs14.x
+      MemorySize: 128
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DDBtable              
+        - S3ReadPolicy:
+            BucketName: !Ref SourceBucketName
+      Environment:
+        Variables:
+          DDBtable: !Ref DDBtable
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1             
+      Events:
+        FileUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref SourceBucket
+            Events: s3:ObjectCreated:*
+            Filter: 
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: '.txt'
+
+  DynamoDBProcessStreamFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.handler
+      Runtime: nodejs14.x
+      CodeUri: streamFunction/
+      Description: Invoked by DynamoDB when new items are put to the application table
+      MemorySize: 128
+      Timeout: 3
+      Events:
+        DDBtableEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt DDBtable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 100                                       
+
+Outputs:
+  SourceBucketName:
+    Value: !Ref SourceBucketName
+    Description: Source bucket
+  FunctionArn:
+    Value: !Ref S3ProcessorFunction
+    Description: S3ProcessorFunction ARN
+  DynamoDBProcessStreamFunctionArn:
+    Value: !Ref DynamoDBProcessStreamFunction
+    Description: DynamoDBProcessStreamFunction ARN    
