@@ -3,7 +3,7 @@
 
 These examples show ways to avoid recursive invocation with Lambda functions and S3 buckets.
 
-To learn more about how this works, see the AWS Compute Blog post: TBD.
+To learn more about how this works, see the AWS Compute Blog post: https://aws.amazon.com/blogs/compute/avoiding-recursive-invocation-with-amazon-s3-and-aws-lambda/.
 
 Important: this application uses various AWS services and there are costs associated with these services after the Free Tier usage - please see the [AWS Pricing page](https://aws.amazon.com/pricing/) for details. You are responsible for any AWS costs incurred. No warranty is implied in this example.
 
