@@ -11,11 +11,28 @@ Resources:
   SourceBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref SourceBucketName    
+      BucketName: !Ref SourceBucketName
+
+  # Enforce HTTPS only access to S3 bucket #
+  BucketForImagePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SourceBucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:*
+          Effect: Deny
+          Principal: "*"
+          Resource:
+          - !Sub "arn:aws:s3:::${SourceBucket}/*"
+          - !Sub "arn:aws:s3:::${SourceBucket}"
+          Condition:
+            Bool:
+              aws:SecureTransport: false
 
   ## Lambda function
   S3ProcessorFunction:
-    Type: AWS::Serverless::Function 
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
       Handler: app.handler
@@ -26,18 +43,18 @@ Resources:
             BucketName: !Ref SourceBucketName
       Environment:
         Variables:
-          DestinationBucketName: !Ref SourceBucketName              
+          DestinationBucketName: !Ref SourceBucketName
       Events:
         FileUpload:
           Type: S3
           Properties:
             Bucket: !Ref SourceBucket
             Events: s3:ObjectCreated:*
-            Filter: 
+            Filter:
               S3Key:
                 Rules:
                   - Name: suffix
-                    Value: '.txt'     
+                    Value: '.txt'
 Outputs:
   SourceBucketName:
     Value: !Ref SourceBucketName

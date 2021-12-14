@@ -11,7 +11,24 @@ Resources:
   SourceBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref SourceBucketName    
+      BucketName: !Ref SourceBucketName
+
+  # Enforce HTTPS only access to S3 bucket #
+  BucketForImagePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SourceBucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:*
+          Effect: Deny
+          Principal: "*"
+          Resource:
+          - !Sub "arn:aws:s3:::${SourceBucket}/*"
+          - !Sub "arn:aws:s3:::${SourceBucket}"
+          Condition:
+            Bool:
+              aws:SecureTransport: false
 
   ## DynamoDB table
   DDBtable:
@@ -25,14 +42,14 @@ Resources:
         KeyType: HASH
       TimeToLiveSpecification:
         AttributeName: TimeToLive
-        Enabled: true        
-      BillingMode: PAY_PER_REQUEST 
+        Enabled: true
+      BillingMode: PAY_PER_REQUEST
       StreamSpecification:
-        StreamViewType: NEW_IMAGE   
+        StreamViewType: NEW_IMAGE
 
   ## Lambda function
   S3ProcessorFunction:
-    Type: AWS::Serverless::Function 
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: s3Function/
       Handler: app.handler
@@ -40,20 +57,20 @@ Resources:
       MemorySize: 128
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref DDBtable              
+            TableName: !Ref DDBtable
         - S3ReadPolicy:
             BucketName: !Ref SourceBucketName
       Environment:
         Variables:
           DDBtable: !Ref DDBtable
-          AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1             
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
       Events:
         FileUpload:
           Type: S3
           Properties:
             Bucket: !Ref SourceBucket
             Events: s3:ObjectCreated:*
-            Filter: 
+            Filter:
               S3Key:
                 Rules:
                   - Name: suffix
@@ -74,7 +91,7 @@ Resources:
           Properties:
             Stream: !GetAtt DDBtable.StreamArn
             StartingPosition: TRIM_HORIZON
-            BatchSize: 100                                       
+            BatchSize: 100
 
 Outputs:
   SourceBucketName:
@@ -85,4 +102,4 @@ Outputs:
     Description: S3ProcessorFunction ARN
   DynamoDBProcessStreamFunctionArn:
     Value: !Ref DynamoDBProcessStreamFunction
-    Description: DynamoDBProcessStreamFunction ARN    
+    Description: DynamoDBProcessStreamFunction ARN
